@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sonatype-registry
+  namespace: nexus
+  labels:
+    app: sonatype-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sonatype-registry
+  template:
+    metadata:
+      labels:
+        app: sonatype-registry
+    spec:
+      containers:
+        - image: sonatype/nexus3
+          name: nexus
+          ports:
+            - containerPort: 8081
+            - containerPort: 8082
+            - containerPort: 8083
+            - containerPort: 9090
+            - containerPort: 9091
+            - containerPort: 9092
+            - containerPort: 9093
+          volumeMounts:
+            - name: registry-vol
+              mountPath: /nexus-data
+              subPath: sonatype
+      volumes:
+        - name: registry-vol
+          persistentVolumeClaim:
+            claimName: sonatype-registry-data-last
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sonatype-service
+  namespace: nexus
+spec:
+  ports:
+    - name: nexus-ui
+      port: 8081
+      targetPort: 8081
+    - name: docker-9090
+      port: 9090
+      targetPort: 9090
+    - name: docker-9091
+      port: 9091
+      targetPort: 9091
+    - name: docker-9092
+      port: 9092
+      targetPort: 9092
+    - name: docker-9093
+      port: 9093
+      targetPort: 9093
+  selector:
+    app: sonatype-registry
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sonatype-registry-data-last
+  namespace: nexus
+spec:
+  storageClassName: azurefile
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---

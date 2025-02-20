@@ -1,0 +1,83 @@
+# NGINX Proxy ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-proxy-config
+  namespace: nexus
+data:
+  nginx.conf: |
+    worker_processes 1;
+    events { worker_connections 1024; }
+    http {
+      upstream repo_a {
+        server 9.141.122.248:9090;
+      }
+      upstream repo_b {
+        server nexus.cloudhub.cz:9092;
+      }
+      server {
+        listen 80;
+        server_name nginx.cloudhub.cz;
+    
+        # Route /repo-a/ requests to Nexus port 9090
+        location /repo-a/ {
+          proxy_pass http://repo_a/;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+        }
+    
+        # Route /repo-b/ requests to Nexus port 9092
+        location /repo-b/ {
+          proxy_pass http://repo_b/;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+        }
+      }
+    }
+---
+# NGINX Proxy Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus-nginx-proxy
+  namespace: nexus
+  labels:
+    app: nexus-nginx-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nexus-nginx-proxy
+  template:
+    metadata:
+      labels:
+        app: nexus-nginx-proxy
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: nginx-proxy-config
+---
+# NGINX Proxy Service (LoadBalancer)
+apiVersion: v1
+kind: Service
+metadata:
+  name: nexus-proxy
+  namespace: nexus
+spec:
+  selector:
+    app: nexus-nginx-proxy
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+  type: LoadBalancer
