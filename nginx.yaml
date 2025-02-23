@@ -9,29 +9,79 @@ data:
     worker_processes 1;
     events { worker_connections 1024; }
     http {
+      client_max_body_size 100M;
+
+      upstream login_repo {
+        server 9.141.122.248:9088;
+      }
       upstream repo_a {
         server 9.141.122.248:9090;
       }
       upstream repo_b {
-        server nexus.cloudhub.cz:9092;
+        server 9.141.122.248:9092;
       }
       server {
         listen 80;
         server_name nginx.cloudhub.cz;
     
-        # Route /repo-a/ requests to Nexus port 9090
-        location /repo-a/ {
-          proxy_pass http://repo_a/;
-          proxy_set_header Host $host;
-          proxy_set_header X-Real-IP $remote_addr;
+        # WORKING CONFIG BACKUP
+        # Rewrite /v2/ requests to /repo-a/v2/ for repo-a
+        # i.e. podman pull nginx.cloudhub.cz/repo-a/repo-b/alpine:3.21.3 --tls-verify=false creates nginx.cloudhub.cz/v2/repo-a/repo-b/alpine:3.21.3
+        # this is translated by following block to repo_a/v2/repo-b/alpine:3.21.3
+        #location ~ ^/v2/(.*)$ {
+        #    rewrite ^/v2/repo-a/(.*)$ /v2/$1 break;
+        #    proxy_pass http://repo_a;
+        #    proxy_set_header Host $host;
+        #    proxy_set_header X-Real-IP $remote_addr;
+        #    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        #    proxy_set_header X-Forwarded-Proto $scheme;
+        #    proxy_buffering off;
+        #    chunked_transfer_encoding off;
+        #}
+        
+        # to perform pull/push to repo-A
+        # i.e. podman pull nginx.cloudhub.cz/repo-a/alpine:3.21.3 --tls-verify=false => nginx.cloudhub.cz/v2/repo-a/alpine:3.21.3
+        # this is translated by following block to repo_a/v2/alpine:3.21.3
+        location ^~ ^/v2/repo-a/(.*)$ {
+            rewrite ^/v2/repo-a/(.*)$ /v2/$1 break;
+            proxy_pass http://repo_a;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
+            chunked_transfer_encoding off;
         }
     
-        # Route /repo-b/ requests to Nexus port 9092
-        location /repo-b/ {
-          proxy_pass http://repo_b/;
-          proxy_set_header Host $host;
-          proxy_set_header X-Real-IP $remote_addr;
+        # to perform pull/push to repo-B
+        # i.e. podman pull nginx.cloudhub.cz/repo-b/alpine:3.21.3 --tls-verify=false => nginx.cloudhub.cz/v2/repo-b/alpine:3.21.3
+        # this is translated by following block to repo_a/v2/repo-b/alpine:3.21.3
+        location ^~ ^/v2/repo-b/(.*)$ {
+            rewrite ^/v2/repo-b/(.*)$ /v2/$1 break;
+            proxy_pass http://repo_b;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
+            chunked_transfer_encoding off;
         }
+    
+        # to login to nexus
+        # it seems while podman login, it sends request to host /v2/ which is not handled by any of the above blocks
+        # so we dont know which repo he wants to login to so we default back to login_repo
+        # every user must be registered in login_repo in order this to work
+        #location ~ ^/v2/(.*)$ {
+        #    rewrite ^/v2/(.*)$ /v2/$1 break;
+        #    proxy_pass http://login_repo;
+        #    proxy_set_header Host $host;
+        #   proxy_set_header X-Real-IP $remote_addr;
+        #    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        #   proxy_set_header X-Forwarded-Proto $scheme;
+        #    proxy_buffering off;
+        #    chunked_transfer_encoding off;
+        #}
+    
       }
     }
 ---
@@ -39,7 +89,7 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nexus-nginx-proxy
+  name: nginx-proxy
   namespace: nexus
   labels:
     app: nexus-nginx-proxy

@@ -22,6 +22,8 @@ spec:
             - containerPort: 8081
             - containerPort: 8082
             - containerPort: 8083
+            - containerPort: 9088
+            - containerPort: 9089
             - containerPort: 9090
             - containerPort: 9091
             - containerPort: 9092
@@ -45,6 +47,10 @@ spec:
     - name: nexus-ui
       port: 8081
       targetPort: 8081
+    - name: docker-9088
+      port: 9088
+    - name: docker-9089
+      port: 9089
     - name: docker-9090
       port: 9090
       targetPort: 9090
