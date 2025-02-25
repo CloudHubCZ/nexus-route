@@ -9,6 +9,12 @@ data:
     worker_processes 1;
     events { worker_connections 1024; }
     http {
+      log_format docker '$remote_addr - $remote_user [$time_local] '
+              '"$request" $status $body_bytes_sent '
+              '"$http_referer" "$http_user_agent" '
+              '"$http_x_forwarded_for" "$host"';
+  
+      access_log /var/log/nginx/docker_access.log docker;
       client_max_body_size 100M;
 
       upstream login_repo {
@@ -20,9 +26,14 @@ data:
       upstream repo_b {
         server 9.141.122.248:9092;
       }
+      upstream group_repo {
+        server 9.141.122.248:9094;
+      }
       server {
         listen 80;
         server_name nginx.cloudhub.cz;
+        error_log   /var/log/nginx/error.log debug;
+        rewrite_log on;
     
         # WORKING CONFIG BACKUP
         # Rewrite /v2/ requests to /repo-a/v2/ for repo-a
@@ -37,50 +48,68 @@ data:
         #    proxy_set_header X-Forwarded-Proto $scheme;
         #    proxy_buffering off;
         #    chunked_transfer_encoding off;
-        #}
+        #}  
+    
+        # to perform PUSH to repo-A
+        location ~ ^/v2/repo-a/(.*)$ {    
+            set $repo_url http://9.141.122.248:9090;
+            set $backend $repo_url;
+            rewrite ^/v2/repo-a/(.*)$ /v2/repo-a/$1 break;
+            # To PULL use group repo
+            if ($request_method = GET) {
+                set $repo_group_url 9.141.122.248:9094;
+                set $backend $repo_group_url;
+            }
+            proxy_pass $backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
+            chunked_transfer_encoding off;
+        }
+    
+        # to perform PUSH to repo-B
+        location ~ ^/v2/repo-b/(.*)$ {    
+            set $repo_url http://9.141.122.248:9092;
+            set $backend $repo_url;
+            rewrite ^/v2/repo-b/(.*)$ /v2/repo-b/$1 break;
+            # To PULL use group repo
+            #map $request_method $backend {
+            #    default $repo_group_url;
+            #    PUT $repo_url;
+            #    HEAD $repo_url;
+            #}
+            #if ($request_method = GET) {
+            if ($request_method != PUT) {
+                if ($request_method != HEAD) {
+                    set $repo_group_url 9.141.122.248:9094;
+                    set $backend $repo_group_url;
+                }
+            }
+            proxy_pass $backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
+            chunked_transfer_encoding off;
+        }
         
-        # to perform pull/push to repo-A
-        # i.e. podman pull nginx.cloudhub.cz/repo-a/alpine:3.21.3 --tls-verify=false => nginx.cloudhub.cz/v2/repo-a/alpine:3.21.3
-        # this is translated by following block to repo_a/v2/alpine:3.21.3
-        location ^~ ^/v2/repo-a/(.*)$ {
-            rewrite ^/v2/repo-a/(.*)$ /v2/$1 break;
-            proxy_pass http://repo_a;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_buffering off;
-            chunked_transfer_encoding off;
-        }
-    
-        # to perform pull/push to repo-B
-        # i.e. podman pull nginx.cloudhub.cz/repo-b/alpine:3.21.3 --tls-verify=false => nginx.cloudhub.cz/v2/repo-b/alpine:3.21.3
-        # this is translated by following block to repo_a/v2/repo-b/alpine:3.21.3
-        location ^~ ^/v2/repo-b/(.*)$ {
-            rewrite ^/v2/repo-b/(.*)$ /v2/$1 break;
-            proxy_pass http://repo_b;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_buffering off;
-            chunked_transfer_encoding off;
-        }
-    
         # to login to nexus
         # it seems while podman login, it sends request to host /v2/ which is not handled by any of the above blocks
         # so we dont know which repo he wants to login to so we default back to login_repo
         # every user must be registered in login_repo in order this to work
-        #location ~ ^/v2/(.*)$ {
-        #    rewrite ^/v2/(.*)$ /v2/$1 break;
-        #    proxy_pass http://login_repo;
-        #    proxy_set_header Host $host;
-        #   proxy_set_header X-Real-IP $remote_addr;
-        #    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        #   proxy_set_header X-Forwarded-Proto $scheme;
-        #    proxy_buffering off;
-        #    chunked_transfer_encoding off;
-        #}
+        location ~ ^/v2/(.*)$ {
+            rewrite ^/v2/(.*)$ /v2/$1 break;
+            proxy_pass http://login_repo;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
+            chunked_transfer_encoding off;
+        }
     
       }
     }

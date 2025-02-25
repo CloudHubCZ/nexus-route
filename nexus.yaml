@@ -28,6 +28,8 @@ spec:
             - containerPort: 9091
             - containerPort: 9092
             - containerPort: 9093
+            - containerPort: 9094
+            - containerPort: 9095
           volumeMounts:
             - name: registry-vol
               mountPath: /nexus-data
@@ -63,6 +65,12 @@ spec:
     - name: docker-9093
       port: 9093
       targetPort: 9093
+    - name: docker-9094
+      port: 9094
+      targetPort: 9094
+    - name: docker-9095
+      port: 9095
+      targetPort: 9095
   selector:
     app: sonatype-registry
   type: LoadBalancer
