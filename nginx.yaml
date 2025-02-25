@@ -80,12 +80,12 @@ data:
             #    PUT $repo_url;
             #    HEAD $repo_url;
             #}
-            #if ($request_method = GET) {
-            if ($request_method != PUT) {
-                if ($request_method != HEAD) {
+            if ($request_method = GET) {
+            #if ($request_method != PUT) {
+            #    if ($request_method != HEAD) {
                     set $repo_group_url 9.141.122.248:9094;
                     set $backend $repo_group_url;
-                }
+            #    }
             }
             proxy_pass $backend;
             proxy_set_header Host $host;
