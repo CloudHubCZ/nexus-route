@@ -42,10 +42,25 @@ podman logout nginx.cloudhub.cz
 podman login nginx.cloudhub.cz --tls-verify=false -u repoa -p repoa
 IMAGE_NAME_A=nginx.cloudhub.cz/repo-a/alpine:3.21.3-a && podman tag docker.io/library/alpine:3.21.3 $IMAGE_NAME_A && podman push $IMAGE_NAME_A --tls-verify=false
 podman pull $IMAGE_NAME_A --tls-verify=false
+podman pull nginx.cloudhub.cz/repo-a/alpine:3.21.3-a --tls-verify=false
+podman push $IMAGE_NAME_A --tls-verify=false
+podman push nginx.cloudhub.cz/repo-a/alpine:3.21.3-a --tls-verify=false
 
 # Examples - REPO-B
 podman logout nginx.cloudhub.cz
 podman login nginx.cloudhub.cz --tls-verify=false -u repob -p repob
 podman pull docker.io/library/alpine:3.20.6
+podman pull nginx.cloudhub.cz/repo-b/alpine:3.20.6-b
 IMAGE_NAME_B=nginx.cloudhub.cz/repo-b/alpine:3.20.6-b && podman tag docker.io/library/alpine:3.20.6 $IMAGE_NAME_B && podman push $IMAGE_NAME_B --tls-verify=false
 podman pull $IMAGE_NAME_B --tls-verify=false
+podman pull nginx.cloudhub.cz/repo-b/alpine:3.20.6-b --tls-verify=false
+podman push $IMAGE_NAME_B --tls-verify=false
+podman push nginx.cloudhub.cz/repo-b/alpine:3.20.6-b --tls-verify=false
+
+# Examples - REPO-B
+podman logout ocp-nginx.cloudhub.cz
+podman login ocp-nginx.cloudhub.cz --tls-verify=false -u ocp -p ocp
+podman pull ocp-nginx.cloudhub.cz/repo-a/alpine:3.21.3-a --tls-verify=false
+podman push ocp-nginx.cloudhub.cz/repo-a/alpine:3.21.3-a --tls-verify=false
+podman pull ocp-nginx.cloudhub.cz/repo-b/alpine:3.20.6-b --tls-verify=false
+podman push ocp-nginx.cloudhub.cz/repo-b/alpine:3.20.6-b --tls-verify=false

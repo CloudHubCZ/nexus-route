@@ -29,6 +29,7 @@ data:
       upstream group_repo {
         server 9.141.122.248:9094;
       }
+    
       server {
         listen 80;
         server_name nginx.cloudhub.cz;
@@ -52,15 +53,16 @@ data:
     
         # to perform PUSH to repo-A
         location ~ ^/v2/repo-a/(.*)$ {    
-            set $repo_url http://9.141.122.248:9090;
-            set $backend $repo_url;
-            rewrite ^/v2/repo-a/(.*)$ /v2/repo-a/$1 break;
+            #set $repo_url http://9.141.122.248:9090;
+            #set $backend $repo_url;
+            #rewrite ^/v2/repo-a/(.*)$ /v2/repo-a/$1 break;
             # To PULL use group repo
-            if ($request_method = GET) {
-                set $repo_group_url 9.141.122.248:9094;
-                set $backend $repo_group_url;
-            }
-            proxy_pass $backend;
+            #if ($request_method = GET) {
+            #    set $repo_group_url 9.141.122.248:9094;
+            #    set $backend $repo_group_url;
+            #}
+            #proxy_pass $backend;
+            proxy_pass http://repo_a;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -71,23 +73,23 @@ data:
     
         # to perform PUSH to repo-B
         location ~ ^/v2/repo-b/(.*)$ {    
-            set $repo_url http://9.141.122.248:9092;
-            set $backend $repo_url;
-            rewrite ^/v2/repo-b/(.*)$ /v2/repo-b/$1 break;
+            #set $repo_url http://9.141.122.248:9092;
+            #set $backend $repo_url;
+            #rewrite ^/v2/repo-b/(.*)$ /v2/repo-b/$1 break;
             # To PULL use group repo
             #map $request_method $backend {
             #    default $repo_group_url;
             #    PUT $repo_url;
             #    HEAD $repo_url;
             #}
-            if ($request_method = GET) {
+            #if ($request_method = GET) {
             #if ($request_method != PUT) {
             #    if ($request_method != HEAD) {
-                    set $repo_group_url 9.141.122.248:9094;
-                    set $backend $repo_group_url;
+            #        set $repo_group_url 9.141.122.248:9094;
+            #        set $backend $repo_group_url;
             #    }
-            }
-            proxy_pass $backend;
+            #}
+            proxy_pass http://repo_b;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -112,6 +114,27 @@ data:
         }
     
       }
+    
+      server {
+        listen 80;
+        server_name ocp-nginx.cloudhub.cz;
+        error_log   /var/log/nginx/error.log debug;
+        rewrite_log on;
+       
+        # to perform PULL on anythign
+        location ~ ^/v2/(.*)$ {    
+            rewrite ^/v2/(.*)$ /v2/$1 break;
+            #set $group_repo 9.141.122.248:9094;
+            #proxy_pass $group_repo;
+            proxy_pass http://group_repo;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
+            chunked_transfer_encoding off;
+        }
+    }
     }
 ---
 # NGINX Proxy Deployment
